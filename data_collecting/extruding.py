@@ -2,64 +2,44 @@ import requests
 import time
 from bs4 import BeautifulSoup
 import re
+import time
+import random
+import json
 
 headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 }
 
-url = "https://realt.by/rent/flat-for-long/?addressV2=%5B%7B%22townUuid%22%3A%224cb07174-7b00-11eb-8943-0cc47adabd66%22%7D%5D&category=2&isNotAgency=true&leasePeriod=999&page=2&rooms=1&sortType=minPrice"
-url = "https://realt.by/rent/cottage-for-long/?addressV2=%5B%7B%22townUuid%22%3A%224cb07174-7b00-11eb-8943-0cc47adabd66%22%7D%5D&page=1"
-url = "https://realt.by/rent/flat-for-long/"
+#url = "https://realt.by/rent/flat-for-long/?addressV2=%5B%7B%22townUuid%22%3A%224cb07174-7b00-11eb-8943-0cc47adabd66%22%7D%5D&category=2&isNotAgency=true&leasePeriod=999&page=2&rooms=1&sortType=minPrice"
+#url = "https://realt.by/rent/cottage-for-long/?addressV2=%5B%7B%22townUuid%22%3A%224cb07174-7b00-11eb-8943-0cc47adabd66%22%7D%5D&page=1"
+url = "https://realt.by/rent/flat-for-long/?page=50"
 response = requests.get(url, headers=headers)
 
-print(response.status_code)  # должно быть 200
+print(response.status_code)
+response.raise_for_status()
 with open("./test_page.html", "w", encoding="utf-8") as f:
     f.write(response.text)
 
-
 soup = BeautifulSoup(response.text, "lxml")
 
-# Примерная структура — нужно смотреть реальные классы на сайте!
-cards = soup.find_all("div", class_="flex flex-col w-full h-full p-5")  # замени на реальный класс
-
-for i, card in enumerate(cards):
-    print(f"\n--- АНАЛИЗ КАРТОЧКИ №{i+1} ---")
-    
-    # ТЕСТ 1: Пробуем найти через CSS-селектор по ОДНОМУ классу
-    price_el = card.select_one("span.text-title")
-    
-    # ТЕСТ 2: Пробуем найти вообще любой тег, содержащий "р./мес." во всей карточке
-    price_by_text = card.find(string=re.compile(r"р\./мес\."))
-    
-    if price_el:
-        print(f"Тест 1 (Класс) СРАБОТАЛ: {price_el.text.strip()}")
-    else:
-        print("Тест 1 (Класс) ВЫДАЛ NONE")
-        
-    if price_by_text:
-        print(f"Тест 2 (Текст) СРАБОТАЛ: {price_by_text.strip()}")
-    else:
-        print("Тест 2 (Текст) ВЫДАЛ NONE")
-        
-    # ЕСЛИ ОБА NONE: выводим кусок HTML этой карточки, чтобы понять, что пошло не так
-    if not price_el and not price_by_text:
-        print("КРИТИЧЕСКАЯ ОШИБКА: BeautifulSoup не видит цену в этой карточке вообще.")
-        # Выведет первые 500 символов внутренностей карточки
-        print("Вот что внутри карточки на самом деле:")
-        print(card.prettify()[:500]) 
-        break # Останавливаем цикл на первой проблемной карточке
-
+# cards = soup.find_all("div", class_="flex flex-col w-full h-full p-5")
+cards = soup.select('div[data-index*=""]')
+print(f"Cards number: {len(cards)}")
 
 for card in cards:
-    #price = card.find("span", class_="text-title font-semibold").text.strip()
-    price = card.select_one("text-title font-semibold")
-    address = card.find("p", class_="text-basic w-full text-subhead md:text-body").text.strip()
-    # rooms = card.find("span", class_="flex flex-wrap text-headline items-center font-semibold md:font-bold -mr-2 -order-2 md:-order-none mb-2  md:mb-4")
-    container = card.find(class_=lambda x: x and "flex flex-wrap text-headline" in x)
-    spans = container.find_all("span")
-    rooms = spans[0].text.strip()
-    area = spans[1].text.strip()
-    floor = spans[2].text.strip()
-    href = card.find(class_="z-1 absolute top-0 left-0 w-full h-full cursor-pointer").href;
-    print(price, address, rooms, area, floor, end='; ')
-    print()
+    # price = card.select_one("span.text-title.font-semibold").text
+    # address = card.select_one("p.text-basic.w-full.text-subhead").text.strip()
+    # container = card.select_one("p.flex.flex-wrap.text-headline")
+    # spans = container.select("span")
+    # rooms = spans[0].text.strip()
+    # area = spans[1].text.strip()
+    # floor = spans[2].text.strip()
+    id = card.select_one('a[href*="/rent-flat-for-long/object/"]')['href'];
+    full_href = f"https://realt.by{id}"
+    response = requests.get(full_href, headers=headers)
+    delay = random.uniform(0.5, 1.5)
+    time.sleep(delay)
+    # print(price, address, rooms, area, floor, id, sep='; ')
+    print(f"{delay}")
+    print(json.dumps(dict(response.headers), indent=4))
+    print(response.headers.get("X-RateLimit-Remaining"))
